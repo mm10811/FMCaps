@@ -55,38 +55,6 @@ Weakly-Supervised Semantic Segmentation (WSSS) strives to achieve dense pixel-le
     └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 📁 Project Structure
-
-```
-FMCaps/
-├── README.md                   # This file
-├── requirements.txt            # Python dependencies
-├── configs/                    # Configuration files
-│   ├── voc_attn_reg.yaml      # PASCAL VOC config
-│   └── coco_attn_reg.yaml     # MS COCO config
-├── datasets/                   # Dataset loaders
-│   ├── voc.py                 # PASCAL VOC dataset
-│   ├── coco.py                # MS COCO dataset
-│   └── transforms.py          # Data augmentation
-├── WeCLIP_model/              # Core model components
-│   ├── model_attn_aff_voc.py  # WeCLIP for VOC
-│   ├── model_attn_aff_coco.py # WeCLIP for COCO
-│   ├── capsule_module.py      # Capsule network module
-│   ├── segformer_head.py      # Segmentation head
-│   └── Decoder/               # Transformer decoder
-├── modules/                    # FMCaps modules
-│   ├── sgfr.py                # SGFR: SAM+Grounding-DINO Fusion
-│   └── sgae.py                # SGAE: SAM-Guided Affinity
-├── tools/                      # Utility scripts
-│   ├── generate_pseudo_labels.py  # Pseudo-label generation
-│   └── visualize_*.py         # Visualization tools
-├── train_voc/                  # VOC training scripts
-├── train_coco/                 # COCO training scripts
-├── test_voc/                   # VOC evaluation scripts
-├── test_coco/                  # COCO evaluation scripts
-└── utils/                      # Utility functions
-```
-
 ## 🔧 Installation
 
 ### Prerequisites
@@ -222,98 +190,6 @@ python test_coco/test_msc_flip_coco.py \
     --save_dir results/coco_val
 ```
 
-## 🔬 Module Details
-
-### SGFR: SAM and Grounding-DINO Fusion Refinement
-
-The SGFR module generates high-quality pseudo-labels by:
-1. Using **Grounding-DINO** for open-set object detection with class name prompts
-2. Extracting **salient point prompts** from CAM local peaks
-3. Prompting **SAM** with both boxes and points for precise segmentation
-4. Applying **conflict resolution** to aggregate class-specific masks
-
-```python
-from modules.sgfr import SGFR
-
-sgfr = SGFR(
-    sam_checkpoint="sam_vit_h_4b8939.pth",
-    gdino_checkpoint="groundingdino_swint_ogc.pth",
-    device="cuda"
-)
-
-pseudo_labels = sgfr.generate(
-    images=images,
-    class_names=["cat", "dog", "person"],
-    cams=initial_cams
-)
-```
-
-### SGAE: SAM-Guided Affinity Enhancement
-
-The SGAE module leverages SAM's structural priors to guide affinity learning:
-
-```python
-from modules.sgae import SGAE
-
-sgae = SGAE(
-    sam_checkpoint="sam_vit_h_4b8939.pth",
-    device="cuda"
-)
-
-affinity_target = sgae.compute_affinity(
-    images=images,
-    features=encoder_features
-)
-```
-
-### Capsule Network Module
-
-Dynamic routing capsule network for structured object representations:
-
-```python
-from WeCLIP_model.capsule_module import create_capsule_module
-
-capsule = create_capsule_module(
-    in_channels=256,
-    num_classes=21,
-    primary_caps_num=32,
-    primary_caps_dim=8,
-    num_routing=3
-)
-
-outputs, enhanced_features = capsule(features, return_enhanced_features=True)
-```
-
-## 📊 Results
-
-### PASCAL VOC 2012
-
-| Method | Backbone | val mIoU | test mIoU |
-|--------|----------|----------|-----------|
-| WeCLIP (Baseline) | ViT-B/16 | 75.0 | 75.7 |
-| **FMCaps (Ours)** | ViT-B/16 | **78.2** | **78.7** |
-
-### MS COCO 2014
-
-| Method | Backbone | val mIoU |
-|--------|----------|----------|
-| WeCLIP (Baseline) | ViT-B/16 | 45.3 |
-| **FMCaps (Ours)** | ViT-B/16 | **48.9** |
-
-## 📝 Citation
-
-If you find this work useful, please cite our paper:
-
-```bibtex
-@article{fmcaps2025,
-  title={Integrating Foundation Models with Capsule Networks for Enhanced Weakly-Supervised Semantic Segmentation},
-  author={Guan, Wei and Yao, Zhuang and Li, Chengxin and Wu, Gengshen and Liu, Yi and Xu, Shoukun},
-  journal={Expert Systems with Applications},
-  year={2025},
-  publisher={Elsevier}
-}
-```
-
 ## 🙏 Acknowledgements
 
 This project builds upon the following excellent works:
@@ -325,10 +201,4 @@ This project builds upon the following excellent works:
 ## 📄 License
 
 This project is released under the [MIT License](LICENSE).
-
-## 📧 Contact
-
-For questions or issues, please open a GitHub issue or contact:
-- Wei Guan - [email]
-- School of Computer Science and Artificial Intelligence, Changzhou University
 
