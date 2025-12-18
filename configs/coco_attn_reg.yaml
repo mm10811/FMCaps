@@ -1,0 +1,83 @@
+# FMCaps Configuration for MS COCO 2014
+# Paper: "Integrating Foundation Models with Capsule Networks for Enhanced WSSS"
+
+dataset:
+  root_dir: ../MSCOCO
+  name_list_dir: ../datasets/coco
+  num_classes: 81
+  crop_size: 320
+  resize_range: [512, 2048]
+  rescale_range: [0.5, 2.0]
+  ignore_index: 255
+
+work_dir:
+  dir: experiment_fmcaps_coco
+  ckpt_dir: checkpoints
+  pred_dir: predictions
+  segs_dir: segs
+  tb_logger_dir: tb_logger
+
+train:
+  split: train
+  samples_per_gpu: 8
+  max_iters: 80000
+  cam_iters: 5000
+  eval_iters: 10000
+  log_iters: 200
+
+val:
+  split: val
+
+optimizer:
+  type: AdamW
+  learning_rate: 2e-4
+  betas: [0.9, 0.999]
+  weight_decay: 0.01
+
+scheduler:
+  warmup_iter: 1500
+  warmup_ratio: 1e-6
+  power: 1.0
+
+clip_init:
+  clip_pretrain_path: ../pretrained/ViT-B-16.pt
+  embedding_dim: 256
+  in_channels: [768, 768, 768, 768]
+
+# Capsule Network Configuration
+capsule:
+  enabled: true
+  loss_weight: 0.1
+  primary_caps_num: 32
+  primary_caps_dim: 8
+  class_caps_dim: 16
+  num_routing: 3
+  enable_segmentation: true
+  enable_feature_enhancement: true
+
+# SGFR Module Configuration (Optional - requires SAM and Grounding-DINO)
+sgfr:
+  enabled: false
+  sam_checkpoint: null  # Path to SAM checkpoint
+  sam_model_type: vit_h
+  gdino_checkpoint: null  # Path to Grounding-DINO checkpoint
+  gdino_config: null
+  box_threshold: 0.3
+  text_threshold: 0.25
+  cam_peak_threshold: 0.5
+
+# SGAE Module Configuration (Optional - requires SAM)
+sgae:
+  enabled: false
+  sam_checkpoint: null
+  sam_model_type: vit_h
+  points_per_side: 32
+  pred_iou_thresh: 0.88
+  stability_score_thresh: 0.95
+
+# Loss weights
+loss:
+  seg_weight: 1.0
+  dice_weight: 0.1
+  attn_weight: 0.1
+  capsule_weight: 0.1

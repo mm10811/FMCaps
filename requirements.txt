@@ -1,0 +1,43 @@
+# FMCaps: Foundation Models with Capsule Networks for WSSS
+# Python 3.8+ required
+
+# Core dependencies
+torch>=1.10.0
+torchvision>=0.11.0
+numpy>=1.21.0
+scipy>=1.7.0
+pillow>=8.0.0
+opencv-python>=4.5.0
+matplotlib>=3.4.0
+
+# Configuration and logging
+omegaconf>=2.1.0
+tensorboard>=2.6.0
+tqdm>=4.62.0
+
+# Image processing
+imageio>=2.9.0
+scikit-image>=0.18.0
+
+# CLIP model
+ftfy>=6.0.0
+regex>=2021.8.0
+
+# Optional: SAM (Segment Anything Model)
+# pip install git+https://github.com/facebookresearch/segment-anything.git
+# segment-anything
+
+# Optional: Grounding-DINO
+# pip install groundingdino-py
+# groundingdino-py
+
+# Optional: Dense CRF for post-processing
+# pydensecrf (needs separate installation)
+
+# Evaluation
+pycocotools>=2.0.4
+
+# Misc
+einops>=0.4.0
+timm>=0.5.0
+

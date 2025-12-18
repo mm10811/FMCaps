@@ -1,0 +1,95 @@
+# FMCaps .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Data directories (large files)
+VOC2012/
+MSCOCO/
+data/
+datasets/voc/*.npy
+datasets/coco/*.npy
+
+# Model checkpoints (large files)
+pretrained/*.pt
+pretrained/*.pth
+*.pth
+*.pt
+checkpoints/
+
+# Experiment outputs
+experiment_*/
+experiments/
+results/
+outputs/
+logs/
+*.log
+
+# TensorBoard
+runs/
+tb_logger/
+events.out.tfevents.*
+
+# Predictions and visualizations
+predictions/
+visualizations/
+*_colored/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Large binary files
+*.tar
+*.tar.gz
+*.zip
+*.rar
+
+# Keep structure files
+!datasets/voc/.gitkeep
+!datasets/coco/.gitkeep
+!pretrained/.gitkeep
+
