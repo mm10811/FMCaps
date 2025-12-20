@@ -4,11 +4,6 @@
 [![PyTorch 1.10+](https://img.shields.io/badge/pytorch-1.10+-red.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Official PyTorch implementation of the paper:
-
-> **Integrating Foundation Models with Capsule Networks for Enhanced Weakly-Supervised Semantic Segmentation**
->
-> *Expert Systems with Applications (ESWA)*
 
 ## 📋 Abstract
 
@@ -29,6 +24,20 @@ Weakly-Supervised Semantic Segmentation (WSSS) strives to achieve dense pixel-le
 ## 🏗️ Framework Overview
 <p align="center">
   <img src="./fig/overview.png" width="800" alt="FMCaps Framework Architecture"/>
+</p>
+
+## 🎨 Pseudo-Label Visualization
+
+Our SGFR module generates high-quality pseudo-labels by combining SAM and Grounding-DINO. Below are visualization examples showing the comparison between input images, CAM-based pseudo-labels, and our SGFR-refined pseudo-labels.
+
+### PASCAL VOC 2012
+<p align="center">
+  <img src="./fig/pseudo_label_voc.png" width="800" alt="Pseudo-label visualization on PASCAL VOC 2012"/>
+</p>
+
+### MS COCO 2014
+<p align="center">
+  <img src="./fig/pseudo_label_coco.png" width="800" alt="Pseudo-label visualization on MS COCO 2014"/>
 </p>
 
 ## 🔧 Installation

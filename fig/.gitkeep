@@ -1,0 +1,6 @@
+# Figure directory for README images
+# Required files:
+# - overview.png: Framework architecture diagram
+# - pseudo_label_voc.png: Pseudo-label visualization for PASCAL VOC
+# - pseudo_label_coco.png: Pseudo-label visualization for MS COCO
+
