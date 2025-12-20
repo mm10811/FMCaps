@@ -147,13 +147,13 @@ python tools/generate_pseudo_labels.py \
 
 ```bash
 # Train on PASCAL VOC with Capsule Network
-python train_voc/voc_train_capsule_dic.py \
+python train/voc_train_capsule.py \
     --config configs/voc_attn_reg.yaml \
     --work_dir experiment_fmcaps_voc \
     --pseudo_label_dir ./VOC2012/pseudo_labels_sgfr
 
 # Train on MS COCO with Capsule Network
-python train_coco/coco_train_capsule_dic.py \
+python train/coco_train_capsule.py \
     --config configs/coco_attn_reg.yaml \
     --work_dir experiment_fmcaps_coco \
     --pseudo_label_dir ./MSCOCO/pseudo_labels_sgfr
@@ -163,13 +163,13 @@ python train_coco/coco_train_capsule_dic.py \
 
 ```bash
 # Evaluate on PASCAL VOC val set
-python test_voc/test_msc_flip_voc.py \
+python test/test_msc_flip_voc.py \
     --config configs/voc_attn_reg.yaml \
     --checkpoint experiment_fmcaps_voc/checkpoints/best.pth \
     --save_dir results/voc_val
 
 # Evaluate on MS COCO val set
-python test_coco/test_msc_flip_coco.py \
+python test/test_msc_flip_coco.py \
     --config configs/coco_attn_reg.yaml \
     --checkpoint experiment_fmcaps_coco/checkpoints/best.pth \
     --save_dir results/coco_val

@@ -8,7 +8,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import random
 import sys
 
-sys.path.append(".")
+sys.path.append("..")
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
 
-from datasets import coco_capsule as coco
+from datasets import voc
 from utils.losses import get_aff_loss
 from utils import evaluate
 from utils.AverageMeter import AverageMeter
@@ -31,8 +31,8 @@ from utils.camutils import cams_to_affinity_label
 from utils.optimizer import PolyWarmupAdamW
 from utils.imutils import tensorboard_image, tensorboard_label, denormalize_img, encode_cmap
 
-# Import WeCLIP model (with capsule network support)
-from WeCLIP_model.model_attn_aff_coco_capsule import WeCLIP
+# Import WeCLIP model
+from WeCLIP_model.model_attn_aff_voc import WeCLIP
 
 warnings.filterwarnings("ignore", category=UserWarning, message=".*MMCV will release v2.0.0.*")
 warnings.filterwarnings("ignore",
@@ -40,16 +40,18 @@ warnings.filterwarnings("ignore",
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config",
-                    default='./configs/coco_attn_reg.yaml',
+                    default='../configs/voc_attn_reg.yaml',
                     type=str,
                     help="config")
 parser.add_argument("--seg_detach", action="store_true", help="detach seg")
-parser.add_argument("--work_dir", default='experiment_fmcaps_coco', type=str, help="work_dir")
+parser.add_argument("--work_dir", default='experiment_fmcaps_voc', type=str, help="work_dir")
 parser.add_argument("--radius", default=8, type=int, help="radius")
 parser.add_argument("--crop_size", default=320, type=int, help="crop_size")
-parser.add_argument("--pseudo_label_dir", default="./MSCOCO/pesudolabels_aug", type=str,
+parser.add_argument("--pseudo_label_dir", default="../VOC2012/pseudo_labels_sgfr", type=str,
                     help="pseudo label directory")
 parser.add_argument("--capsule_loss_weight", default=0.1, type=float, help="capsule loss weight")
+parser.add_argument("--use_capsule", type=bool, default=True, help="enable capsule network")
+parser.add_argument("--disable_capsule", action="store_true", help="disable capsule network (overrides use_capsule)")
 parser.add_argument("--primary_caps_num", default=32, type=int, help="number of primary capsules")
 parser.add_argument("--primary_caps_dim", default=8, type=int, help="dimension of primary capsules")
 parser.add_argument("--num_routing", default=3, type=int, help="number of routing iterations")
@@ -175,11 +177,10 @@ def save_val_visualization(inputs, segs, cam, labels, names, save_dir, iter_num,
 
 
 def validate(model=None, data_loader=None, cfg=None, save_vis=False, iter_num=0):
-    preds, gts = [], []
+    preds, gts, cams, aff_gts = [], [], [], []
     num = 1
-    # COCO dataset has 81 classes
-    seg_hist = np.zeros((81, 81))
-    
+    seg_hist = np.zeros((21, 21))
+    cam_hist = np.zeros((21, 21))
     for _, data in tqdm(enumerate(data_loader),
                         total=len(data_loader), ncols=100, ascii=" >="):
         name, inputs, labels, cls_label = data
@@ -187,33 +188,33 @@ def validate(model=None, data_loader=None, cfg=None, save_vis=False, iter_num=0)
         inputs = inputs.cuda()
         labels = labels.cuda()
 
-        # Validation mode, cam returns None
+        # Validation mode, no capsule network output
         segs, cam, attn_loss = model(inputs, name, 'val')
 
         resized_segs = F.interpolate(segs, size=labels.shape[1:], mode='bilinear', align_corners=False)
 
-        pred_labels = torch.argmax(resized_segs, dim=1).detach().cpu().numpy().astype(np.int16)
-        preds += list(pred_labels)
+        preds += list(torch.argmax(resized_segs, dim=1).detach().cpu().numpy().astype(np.int16))
+        cams += list(cam.detach().cpu().numpy().astype(np.int16))
         gts += list(labels.detach().cpu().numpy().astype(np.int16))
 
         # Save validation visualization (only for first few batches)
         if save_vis and num <= 3:
             try:
-                # cam is None, use segmentation prediction for visualization
-                cam_for_vis = torch.argmax(resized_segs, dim=1)
-                save_val_visualization(inputs, resized_segs, cam_for_vis, labels, name, cfg.work_dir.vis_dir, iter_num)
+                save_val_visualization(inputs, resized_segs, cam, labels, name, cfg.work_dir.vis_dir, iter_num)
             except Exception as e:
                 logging.warning(f"Failed to save validation visualization: {e}")
 
         num += 1
 
         if num % 1000 == 0:
-            seg_hist, seg_score = evaluate.scores(gts, preds, seg_hist, num_classes=81)
-            preds, gts = [], []
+            seg_hist, seg_score = evaluate.scores(gts, preds, seg_hist)
+            cam_hist, cam_score = evaluate.scores(gts, cams, cam_hist)
+            preds, gts, cams, aff_gts = [], [], [], []
 
-    seg_hist, seg_score = evaluate.scores(gts, preds, seg_hist, num_classes=81)
+    seg_hist, seg_score = evaluate.scores(gts, preds, seg_hist)
+    cam_hist, cam_score = evaluate.scores(gts, cams, cam_hist)
     model.train()
-    return seg_score
+    return seg_score, cam_score
 
 
 def get_seg_loss(pred, label, ignore_index=255):
@@ -369,8 +370,7 @@ def train(cfg):
     time0 = datetime.datetime.now()
     time0 = time0.replace(microsecond=0)
 
-    # Use dataset class that supports pseudo labels
-    train_dataset = coco.CocoPseudoLabelDataset(
+    train_dataset = voc.VOC12SegDataset(
         root_dir=cfg.dataset.root_dir,
         name_list_dir=cfg.dataset.name_list_dir,
         split=cfg.train.split,
@@ -381,15 +381,14 @@ def train(cfg):
         crop_size=cfg.dataset.crop_size,
         img_fliplr=True,
         ignore_index=cfg.dataset.ignore_index,
-        num_classes=cfg.dataset.num_classes,
         pseudo_label_dir=args.pseudo_label_dir,  # Pseudo label directory
     )
 
-    val_dataset = coco.CocoSegDataset(
+    val_dataset = voc.VOC12SegDataset(
         root_dir=cfg.dataset.root_dir,
         name_list_dir=cfg.dataset.name_list_dir,
         split=cfg.val.split,
-        stage='val',
+        stage='train',
         aug=False,
         ignore_index=cfg.dataset.ignore_index,
         num_classes=cfg.dataset.num_classes,
@@ -411,15 +410,17 @@ def train(cfg):
                             drop_last=False)
 
     # Create WeCLIP model with capsule network integration
-    capsule_config = {
-        'feature_size': cfg.dataset.crop_size // 16,  # Calculate feature map size based on crop_size
-        'primary_caps_num': args.primary_caps_num,
-        'primary_caps_dim': args.primary_caps_dim,
-        'class_caps_dim': 16,
-        'num_routing': args.num_routing,
-        'enable_segmentation': True,
-        'enable_feature_enhancement': True
-    }
+    capsule_config = None
+    if args.use_capsule:
+        capsule_config = {
+            'feature_size': cfg.dataset.crop_size // 16,  # Calculate feature map size based on crop_size
+            'primary_caps_num': args.primary_caps_num,
+            'primary_caps_dim': args.primary_caps_dim,
+            'class_caps_dim': 16,
+            'num_routing': args.num_routing,
+            'enable_segmentation': True,
+            'enable_feature_enhancement': True
+        }
 
     WeCLIP_model = WeCLIP(
         num_classes=cfg.dataset.num_classes,
@@ -428,11 +429,11 @@ def train(cfg):
         in_channels=cfg.clip_init.in_channels,
         dataset_root_path=cfg.dataset.root_dir,
         device='cuda',
-        use_capsule=True,
+        use_capsule=args.use_capsule,
         capsule_config=capsule_config
     )
 
-    logging.info("WeCLIP model created, capsule network enabled")
+    logging.info(f"WeCLIP model created, capsule network: {'enabled' if args.use_capsule else 'disabled'}")
 
     param_groups = WeCLIP_model.get_param_groups()
     WeCLIP_model.cuda()
@@ -465,8 +466,8 @@ def train(cfg):
         },
     ]
 
-    # Add capsule network parameter group
-    if len(param_groups) > 4:
+    # Add capsule network parameter group if enabled
+    if args.use_capsule and len(param_groups) > 4:
         optimizer_params.append({
             "params": param_groups[4],  # Capsule network parameters
             "lr": cfg.optimizer.learning_rate * 5,  # Higher learning rate for capsule network
@@ -497,43 +498,19 @@ def train(cfg):
             train_loader_iter = iter(train_loader)
             img_name, inputs, pseudo_labels, cls_labels, img_box = next(train_loader_iter)
 
-        # Forward pass - capsule network mode
-        segs, cam, attn_pred, capsule_outputs = WeCLIP_model(inputs.cuda(), img_name, mode='train')
+        # Forward pass - different outputs based on capsule network status
+        outputs = WeCLIP_model(inputs.cuda(), img_name, mode='train')
 
-        # Use preloaded pseudo labels, use CAM as replacement if pseudo labels are missing
+        if args.use_capsule and len(outputs) == 4:
+            # Capsule network enabled outputs
+            segs, cam, attn_pred, capsule_outputs = outputs
+        else:
+            # Standard outputs
+            segs, cam, attn_pred = outputs
+            capsule_outputs = None
+
+        # Use pseudo labels
         pseudo_labels = pseudo_labels.cuda()
-        
-        # Check if each sample's pseudo label is valid (not all ignore_index)
-        # If pseudo label is missing (all ignore_index), use CAM as replacement
-        batch_size_pl = pseudo_labels.shape[0]
-        cam_used_count = 0  # Count samples using CAM replacement
-        for b_idx in range(batch_size_pl):
-            # Check if sample's pseudo label is all ignore_index
-            valid_mask = pseudo_labels[b_idx] != cfg.dataset.ignore_index
-            if not valid_mask.any():
-                # Pseudo label missing, use CAM as replacement
-                cam_sample = cam[b_idx]  # Get current sample's CAM
-                
-                # Handle CAM dimensions: cam may be (H, W) or already correct size
-                if cam_sample.shape != pseudo_labels[b_idx].shape:
-                    # Need to resize CAM
-                    if cam_sample.dim() == 2:
-                        cam_resized = F.interpolate(
-                            cam_sample.unsqueeze(0).unsqueeze(0).float(),
-                            size=pseudo_labels.shape[1:],
-                            mode='nearest'
-                        ).squeeze(0).squeeze(0).long()
-                    else:
-                        cam_resized = cam_sample.long()
-                else:
-                    cam_resized = cam_sample.long()
-                
-                pseudo_labels[b_idx] = cam_resized
-                cam_used_count += 1
-        
-        # Log CAM replacement usage (log every few iterations to avoid too many logs)
-        if cam_used_count > 0 and (n_iter + 1) % cfg.train.log_iters == 0:
-            logging.info(f"Batch has {cam_used_count}/{batch_size_pl} samples using CAM to replace missing pseudo labels")
 
         # Align prediction with pseudo label size
         segs = F.interpolate(segs, size=pseudo_labels.shape[1:], mode='bilinear', align_corners=False)
@@ -541,8 +518,11 @@ def train(cfg):
         # 1. Compute segmentation loss
         seg_loss = get_seg_loss(segs, pseudo_labels.type(torch.long), ignore_index=cfg.dataset.ignore_index)
 
-        # 2. Compute capsule network loss
-        capsule_loss, capsule_loss_dict = WeCLIP_model.compute_capsule_loss(capsule_outputs, pseudo_labels)
+        # 2. Compute capsule network loss (if enabled)
+        capsule_loss = torch.tensor(0.0, device=segs.device)
+        capsule_loss_dict = {}
+        if args.use_capsule and capsule_outputs is not None:
+            capsule_loss, capsule_loss_dict = WeCLIP_model.compute_capsule_loss(capsule_outputs, pseudo_labels)
 
         # Use original affinity loss
         fts = cam.clone()
@@ -604,7 +584,7 @@ def train(cfg):
             if (n_iter + 1) % (cfg.train.log_iters * 10) == 0:
                 try:
                     logging.info(
-                        f"Visualization debug info - inputs: {inputs.shape}, segs: {segs.shape}, cam: {cam.shape}, pseudo_labels: {pseudo_labels.shape}")
+                        f"Visualization debug info - inputs: {inputs.shape}, segs: {segs.shape}, cam: {cam.shape}, pseudo_label: {pseudo_labels.shape}")
                     save_visualization(inputs, segs, cam, pseudo_labels, img_name, cfg.work_dir.vis_dir,
                                        n_iter + 1, capsule_outputs=capsule_outputs)
                     logging.info(f"Saved visualization images to {cfg.work_dir.vis_dir}")
@@ -614,16 +594,19 @@ def train(cfg):
                     logging.warning(f"Detailed error: {traceback.format_exc()}")
 
         if (n_iter + 1) % cfg.train.eval_iters == 0:
-            ckpt_name = os.path.join(cfg.work_dir.ckpt_dir, f"WeCLIP_capsule_model_iter_{n_iter + 1}.pth")
+            model_name = "WeCLIP_capsule_model" if args.use_capsule else "WeCLIP_model"
+            ckpt_name = os.path.join(cfg.work_dir.ckpt_dir, f"{model_name}_iter_{n_iter + 1}.pth")
             logging.info('Validating...')
-            if (n_iter + 1) > 40000:
+            if (n_iter + 1) > 28000:
                 torch.save(WeCLIP_model.state_dict(), ckpt_name)
                 logging.info(f"Model saved to: {ckpt_name}")
 
             # Save visualization every few validations
             save_vis = (n_iter + 1) % (cfg.train.eval_iters * 2) == 0
-            seg_score = validate(model=WeCLIP_model, data_loader=val_loader, cfg=cfg,
-                                 save_vis=save_vis, iter_num=n_iter + 1)
+            seg_score, cam_score = validate(model=WeCLIP_model, data_loader=val_loader, cfg=cfg,
+                                            save_vis=save_vis, iter_num=n_iter + 1)
+            logging.info("cams score:")
+            logging.info(cam_score)
             logging.info("segs score:")
             logging.info(seg_score)
 
@@ -634,6 +617,10 @@ def train(cfg):
 if __name__ == "__main__":
 
     args = parser.parse_args()
+
+    # Handle capsule network parameter logic
+    if args.disable_capsule:
+        args.use_capsule = False
 
     cfg = OmegaConf.load(args.config)
     cfg.dataset.crop_size = args.crop_size
@@ -657,7 +644,7 @@ if __name__ == "__main__":
     logging.info('\nargs: %s' % args)
     logging.info('\nconfigs: %s' % cfg)
     logging.info(
-        f'\nCapsule network params: capsule_loss_weight={args.capsule_loss_weight}, primary_caps_num={args.primary_caps_num}, primary_caps_dim={args.primary_caps_dim}, num_routing={args.num_routing}')
+        f'\nCapsule network params: capsule_loss_weight={args.capsule_loss_weight}, use_capsule={args.use_capsule}, primary_caps_num={args.primary_caps_num}, primary_caps_dim={args.primary_caps_dim}, num_routing={args.num_routing}')
 
     setup_seed(1)
     train(cfg=cfg)

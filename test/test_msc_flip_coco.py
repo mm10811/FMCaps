@@ -1,7 +1,7 @@
 import argparse
 import os
 import sys
-sys.path.append(".")
+sys.path.append("..")
 from utils.dcrf import DenseCRF
 from utils.imutils import encode_cmap
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -18,7 +18,7 @@ from WeCLIP_model.model_attn_aff_coco import WeCLIP
 import imageio.v2 as imageio
 parser = argparse.ArgumentParser()
 parser.add_argument("--config",
-                    default='configs/coco_attn_reg.yaml',
+                    default='../configs/coco_attn_reg.yaml',
                     type=str,
                     help="config")
 parser.add_argument("--work_dir", default="results", type=str, help="work_dir")

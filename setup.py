@@ -41,7 +41,8 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "fmcaps-train=train_voc.voc_train_capsule_dic:main",
+            "fmcaps-train-voc=train.voc_train_capsule:main",
+            "fmcaps-train-coco=train.coco_train_capsule:main",
             "fmcaps-eval=tools.evaluate:main",
             "fmcaps-infer=tools.inference:main",
             "fmcaps-pseudo=tools.generate_pseudo_labels:main",
