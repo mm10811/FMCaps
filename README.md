@@ -28,8 +28,6 @@ Weakly-Supervised Semantic Segmentation (WSSS) strives to achieve dense pixel-le
 
 ## 🎨 Pseudo-Label Visualization
 
-Our SGFR module generates high-quality pseudo-labels by combining SAM and Grounding-DINO. Below are visualization examples showing the comparison between input images, CAM-based pseudo-labels, and our SGFR-refined pseudo-labels.
-
 ### PASCAL VOC 2012
 <p align="center">
   <img src="./fig/pseudo_label_voc.png" width="800" alt="Pseudo-label visualization on PASCAL VOC 2012"/>
@@ -46,30 +44,6 @@ Our SGFR module generates high-quality pseudo-labels by combining SAM and Ground
 - Python 3.8+
 - PyTorch 1.10+
 - CUDA 11.0+
-
-### Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/FMCaps.git
-cd FMCaps
-
-# Create conda environment
-conda create -n fmcaps python=3.8
-conda activate fmcaps
-
-# Install PyTorch (adjust CUDA version as needed)
-pip install torch==1.12.0+cu113 torchvision==0.13.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Install Grounding-DINO (optional, for SGFR)
-pip install groundingdino-py
-
-# Install SAM (optional, for SGFR and SGAE)
-pip install segment-anything
-```
 
 ## 📦 Data Preparation
 
@@ -125,54 +99,14 @@ wget -P pretrained/ https://openaipublic.azureedge.net/clip/models/5806e77cd80f8
 
 ## 🚀 Usage
 
-### Step 1: Generate High-Quality Pseudo Labels (SGFR)
-
-```bash
-# For PASCAL VOC
-python tools/generate_pseudo_labels.py \
-    --dataset voc \
-    --data_root ./VOC2012 \
-    --output_dir ./VOC2012/pseudo_labels_sgfr \
-    --use_sam --use_gdino
-
-# For MS COCO
-python tools/generate_pseudo_labels.py \
-    --dataset coco \
-    --data_root ./MSCOCO \
-    --output_dir ./MSCOCO/pseudo_labels_sgfr \
-    --use_sam --use_gdino
-```
-
-### Step 2: Train Segmentation Network
+### Train Segmentation Network
 
 ```bash
 # Train on PASCAL VOC with Capsule Network
-python train/voc_train_capsule.py \
-    --config configs/voc_attn_reg.yaml \
-    --work_dir experiment_fmcaps_voc \
-    --pseudo_label_dir ./VOC2012/pseudo_labels_sgfr
+python train/voc_train_capsule.py 
 
 # Train on MS COCO with Capsule Network
-python train/coco_train_capsule.py \
-    --config configs/coco_attn_reg.yaml \
-    --work_dir experiment_fmcaps_coco \
-    --pseudo_label_dir ./MSCOCO/pseudo_labels_sgfr
-```
-
-### Step 3: Evaluation
-
-```bash
-# Evaluate on PASCAL VOC val set
-python test/test_msc_flip_voc.py \
-    --config configs/voc_attn_reg.yaml \
-    --checkpoint experiment_fmcaps_voc/checkpoints/best.pth \
-    --save_dir results/voc_val
-
-# Evaluate on MS COCO val set
-python test/test_msc_flip_coco.py \
-    --config configs/coco_attn_reg.yaml \
-    --checkpoint experiment_fmcaps_coco/checkpoints/best.pth \
-    --save_dir results/coco_val
+python train/coco_train_capsule.py
 ```
 
 ## 🙏 Acknowledgements
