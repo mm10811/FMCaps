@@ -4,8 +4,6 @@ import logging
 import os
 import warnings
 
-from WeCLIP_model.dice_loss import DiceLoss
-
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import random
 import sys
@@ -21,8 +19,8 @@ from tqdm import tqdm
 import cv2
 import matplotlib.pyplot as plt
 
-# 解决中文字体显示问题
-plt.rcParams['font.sans-serif'] = ['DejaVu Sans']  # 使用英文字体
+# Font settings for visualization
+plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
 
 from datasets import voc
@@ -33,11 +31,10 @@ from utils.camutils import cams_to_affinity_label
 from utils.optimizer import PolyWarmupAdamW
 from utils.imutils import tensorboard_image, tensorboard_label, denormalize_img, encode_cmap
 
-# 导入新的WeCLIP模型
+# Import WeCLIP model
 from WeCLIP_model.model_attn_aff_voc import WeCLIP
 
 warnings.filterwarnings("ignore", category=UserWarning, message=".*MMCV will release v2.0.0.*")
-# 忽略 PyTorch upsample 的警告 (如果确定是外部库引起的且不想修改)
 warnings.filterwarnings("ignore",
                         message="nn.functional.upsample is deprecated. Use nn.functional.interpolate instead.")
 
@@ -47,7 +44,7 @@ parser.add_argument("--config",
                     type=str,
                     help="config")
 parser.add_argument("--seg_detach", action="store_true", help="detach seg")
-parser.add_argument("--work_dir", default='experiment_capsule_dice2', type=str, help="work_dir")
+parser.add_argument("--work_dir", default='experiment_fmcaps_voc', type=str, help="work_dir")
 parser.add_argument("--radius", default=8, type=int, help="radius")
 parser.add_argument("--crop_size", default=320, type=int, help="crop_size")
 parser.add_argument("--pseudo_label_dir", default="../VOC2012/pesudolabels_aug", type=str,
@@ -69,7 +66,7 @@ def setup_seed(seed):
 
 
 def setup_logger(filename='test.log'):
-    ## setup logger
+    """Setup logger"""
     logFormatter = logging.Formatter('%(asctime)s - %(filename)s - %(levelname)s: %(message)s')
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
@@ -96,7 +93,7 @@ def cal_eta(time0, cur_iter, total_iter):
 
 
 def save_val_visualization(inputs, segs, cam, labels, names, save_dir, iter_num, max_samples=5):
-    """保存验证过程中的可视化图像"""
+    """Save visualization images during validation"""
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
 
@@ -106,65 +103,65 @@ def save_val_visualization(inputs, segs, cam, labels, names, save_dir, iter_num,
 
     batch_size = min(max_samples, inputs.size(0))
 
-    # 反归一化输入图像
+    # Denormalize input images
     denorm_imgs = denormalize_img(inputs[:batch_size])
 
-    # 预测结果
+    # Prediction results
     pred_segs = torch.argmax(segs[:batch_size], dim=1)
 
-    # CAM热力图
+    # CAM heatmap
     cam_vis = cam[:batch_size]
 
-    # 真实标签
+    # Ground truth labels
     gt_labels = labels[:batch_size]
 
     for i in range(batch_size):
         try:
-            # 创建子图
+            # Create subplots
             fig, axes = plt.subplots(1, 4, figsize=(16, 4))
 
-            # 原始图像
+            # Original image
             img = denorm_imgs[i].permute(1, 2, 0).cpu().numpy().astype(np.uint8)
             axes[0].imshow(img)
             axes[0].set_title('Original Image')
             axes[0].axis('off')
 
-            # CAM热力图 - 处理不同维度
+            # CAM heatmap - handle different dimensions
             if cam_vis[i].dim() == 3:  # (num_classes, H, W)
                 cam_np = cam_vis[i].max(dim=0)[0].detach().cpu().numpy()
             elif cam_vis[i].dim() == 2:  # (H, W)
                 cam_np = cam_vis[i].detach().cpu().numpy()
             else:
-                # 如果维度不匹配，跳过这个样本
+                # Skip this sample if dimensions don't match
                 plt.close()
                 continue
 
-            # 归一化CAM到0-1范围
+            # Normalize CAM to 0-1 range
             cam_np = (cam_np - cam_np.min()) / (cam_np.max() - cam_np.min() + 1e-8)
             cam_colored = plt.cm.jet(cam_np)[:, :, :3]
-            # 将CAM叠加到原图上
+            # Overlay CAM on original image
             cam_overlay = 0.6 * img / 255.0 + 0.4 * cam_colored
             axes[1].imshow(cam_overlay)
             axes[1].set_title('CAM Heatmap')
             axes[1].axis('off')
 
-            # 预测分割结果
+            # Predicted segmentation
             pred_seg = pred_segs[i].detach().cpu().numpy()
             pred_colored = encode_cmap(pred_seg)
             axes[2].imshow(pred_colored)
             axes[2].set_title('Predicted Segmentation')
             axes[2].axis('off')
 
-            # 真实标签
+            # Ground truth
             gt_np = gt_labels[i].detach().cpu().numpy()
             gt_colored = encode_cmap(gt_np)
             axes[3].imshow(gt_colored)
             axes[3].set_title('Ground Truth')
             axes[3].axis('off')
 
-            # 保存图像
+            # Save image
             img_name = names[i] if i < len(names) else f'val_sample_{i}'
-            # 清理文件名，移除不安全字符
+            # Clean filename, remove unsafe characters
             img_name = str(img_name).replace('/', '_').replace('\\', '_').replace('.jpg', '').replace('.png', '')
             save_path = os.path.join(val_vis_dir, f'val_iter_{iter_num:06d}_{img_name}.png')
             plt.tight_layout()
@@ -172,8 +169,8 @@ def save_val_visualization(inputs, segs, cam, labels, names, save_dir, iter_num,
             plt.close(fig)
 
         except Exception as e:
-            # 如果某个样本处理失败，记录错误但继续处理其他样本
-            logging.warning(f"处理验证第{i}个样本时出错: {e}")
+            # Log error but continue processing other samples
+            logging.warning(f"Error processing validation sample {i}: {e}")
             if 'fig' in locals():
                 plt.close(fig)
             continue
@@ -191,7 +188,7 @@ def validate(model=None, data_loader=None, cfg=None, save_vis=False, iter_num=0)
         inputs = inputs.cuda()
         labels = labels.cuda()
 
-        # 验证模式，不返回胶囊网络输出
+        # Validation mode, no capsule network output
         segs, cam, attn_loss = model(inputs, name, 'val')
 
         resized_segs = F.interpolate(segs, size=labels.shape[1:], mode='bilinear', align_corners=False)
@@ -200,12 +197,12 @@ def validate(model=None, data_loader=None, cfg=None, save_vis=False, iter_num=0)
         cams += list(cam.detach().cpu().numpy().astype(np.int16))
         gts += list(labels.detach().cpu().numpy().astype(np.int16))
 
-        # 保存验证可视化（只在前几个batch保存）
+        # Save validation visualization (only for first few batches)
         if save_vis and num <= 3:
             try:
                 save_val_visualization(inputs, resized_segs, cam, labels, name, cfg.work_dir.vis_dir, iter_num)
             except Exception as e:
-                logging.warning(f"保存验证可视化失败: {e}")
+                logging.warning(f"Failed to save validation visualization: {e}")
 
         num += 1
 
@@ -253,76 +250,76 @@ def get_mask_by_radius(h=20, w=20, radius=8):
 
 def save_visualization(inputs, segs, cam, pseudo_label, img_names, save_dir, iter_num, batch_size=4,
                        capsule_outputs=None):
-    """保存训练过程中的可视化图像，包括胶囊网络输出"""
+    """Save visualization images during training, including capsule network output"""
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
 
-    # 限制batch大小，避免图像过多
+    # Limit batch size to avoid too many images
     batch_size = min(batch_size, inputs.size(0))
 
-    # 反归一化输入图像
+    # Denormalize input images
     denorm_imgs = denormalize_img(inputs[:batch_size])
 
-    # 预测结果
+    # Prediction results
     pred_segs = torch.argmax(segs[:batch_size], dim=1)
 
-    # CAM热力图 - 根据实际维度处理
+    # CAM heatmap - handle actual dimensions
     cam_vis = cam[:batch_size]
 
-    # 伪标签 - 根据实际维度处理
+    # Pseudo labels - handle actual dimensions
     pseudo_vis = pseudo_label[:batch_size]
 
     for i in range(batch_size):
         try:
-            # 根据是否有胶囊网络输出决定子图数量
+            # Determine number of subplots based on capsule network output
             if capsule_outputs is not None and 'seg_logits' in capsule_outputs:
                 fig, axes = plt.subplots(2, 3, figsize=(18, 12))
                 axes = axes.flatten()
             else:
                 fig, axes = plt.subplots(1, 4, figsize=(16, 4))
 
-            # 原始图像
+            # Original image
             img = denorm_imgs[i].permute(1, 2, 0).cpu().numpy().astype(np.uint8)
             axes[0].imshow(img)
             axes[0].set_title('Original Image')
             axes[0].axis('off')
 
-            # CAM热力图 - 处理不同维度
+            # CAM heatmap - handle different dimensions
             if cam_vis[i].dim() == 3:  # (num_classes, H, W)
                 cam_np = cam_vis[i].max(dim=0)[0].detach().cpu().numpy()
             elif cam_vis[i].dim() == 2:  # (H, W)
                 cam_np = cam_vis[i].detach().cpu().numpy()
             else:
-                # 如果维度不匹配，跳过这个样本
+                # Skip this sample if dimensions don't match
                 plt.close()
                 continue
 
-            # 归一化CAM到0-1范围
+            # Normalize CAM to 0-1 range
             cam_np = (cam_np - cam_np.min()) / (cam_np.max() - cam_np.min() + 1e-8)
             cam_colored = plt.cm.jet(cam_np)[:, :, :3]
-            # 将CAM叠加到原图上
+            # Overlay CAM on original image
             cam_overlay = 0.6 * img / 255.0 + 0.4 * cam_colored
             axes[1].imshow(cam_overlay)
             axes[1].set_title('CAM Heatmap')
             axes[1].axis('off')
 
-            # 预测分割结果
+            # Predicted segmentation
             pred_seg = pred_segs[i].detach().cpu().numpy()
             pred_colored = encode_cmap(pred_seg)
             axes[2].imshow(pred_colored)
             axes[2].set_title('Final Segmentation')
             axes[2].axis('off')
 
-            # 伪标签
+            # Pseudo label
             pseudo_np = pseudo_vis[i].detach().cpu().numpy()
             pseudo_colored = encode_cmap(pseudo_np)
             axes[3].imshow(pseudo_colored)
             axes[3].set_title('Pseudo Label')
             axes[3].axis('off')
 
-            # 如果有胶囊网络输出，添加额外的可视化
+            # Add extra visualization if capsule network output is available
             if capsule_outputs is not None and 'seg_logits' in capsule_outputs:
-                # 胶囊分割结果
+                # Capsule segmentation result
                 capsule_seg_logits = capsule_outputs['seg_logits']
                 if capsule_seg_logits.shape[-2:] != pred_segs.shape[-2:]:
                     capsule_seg_logits = F.interpolate(capsule_seg_logits, size=pred_segs.shape[-2:],
@@ -333,10 +330,10 @@ def save_visualization(inputs, segs, cam, pseudo_label, img_names, save_dir, ite
                 axes[4].set_title('Capsule Segmentation')
                 axes[4].axis('off')
 
-                # 胶囊特征可视化（如果有主胶囊输出）
+                # Capsule feature visualization (if primary capsule output available)
                 if 'primary_caps' in capsule_outputs:
                     primary_caps = capsule_outputs['primary_caps'][i]  # [num_caps, H, W, dim]
-                    # 计算胶囊长度作为特征强度
+                    # Compute capsule length as feature strength
                     caps_length = torch.sqrt((primary_caps ** 2).sum(dim=-1))  # [num_caps, H, W]
                     caps_vis = caps_length.mean(dim=0).detach().cpu().numpy()  # [H, W]
                     caps_vis = (caps_vis - caps_vis.min()) / (caps_vis.max() - caps_vis.min() + 1e-8)
@@ -346,9 +343,9 @@ def save_visualization(inputs, segs, cam, pseudo_label, img_names, save_dir, ite
                 else:
                     axes[5].axis('off')
 
-            # 保存图像
+            # Save image
             img_name = img_names[i] if i < len(img_names) else f'sample_{i}'
-            # 清理文件名，移除不安全字符
+            # Clean filename, remove unsafe characters
             img_name = str(img_name).replace('/', '_').replace('\\', '_').replace('.jpg', '').replace('.png', '')
             save_path = os.path.join(save_dir, f'iter_{iter_num:06d}_{img_name}.png')
             plt.tight_layout()
@@ -356,14 +353,14 @@ def save_visualization(inputs, segs, cam, pseudo_label, img_names, save_dir, ite
             plt.close(fig)
 
         except Exception as e:
-            # 如果某个样本处理失败，记录错误但继续处理其他样本
-            logging.warning(f"处理第{i}个样本时出错: {e}")
+            # Log error but continue processing other samples
+            logging.warning(f"Error processing sample {i}: {e}")
             if 'fig' in locals():
                 plt.close(fig)
             continue
 
-        # 只保存前几张图像，避免占用太多空间
-        if i >= 2:  # 每次最多保存3张图像
+        # Only save first few images to avoid taking too much space
+        if i >= 2:  # Save at most 3 images each time
             break
 
 
@@ -384,7 +381,7 @@ def train(cfg):
         crop_size=cfg.dataset.crop_size,
         img_fliplr=True,
         ignore_index=cfg.dataset.ignore_index,
-        pseudo_label_dir=args.pseudo_label_dir,  # 伪标签目录
+        pseudo_label_dir=args.pseudo_label_dir,  # Pseudo label directory
     )
 
     val_dataset = voc.VOC12SegDataset(
@@ -412,11 +409,11 @@ def train(cfg):
                             pin_memory=False,
                             drop_last=False)
 
-    # 创建集成胶囊网络的WeCLIP模型
+    # Create WeCLIP model with capsule network integration
     capsule_config = None
     if args.use_capsule:
         capsule_config = {
-            'feature_size': cfg.dataset.crop_size // 16,  # 根据crop_size计算特征图尺寸
+            'feature_size': cfg.dataset.crop_size // 16,  # Calculate feature map size based on crop_size
             'primary_caps_num': args.primary_caps_num,
             'primary_caps_dim': args.primary_caps_dim,
             'class_caps_dim': 16,
@@ -436,8 +433,7 @@ def train(cfg):
         capsule_config=capsule_config
     )
 
-    logging.info(f"创建WeCLIP模型完成，胶囊网络: {'启用' if args.use_capsule else '禁用'}")
-    logging.info(f"本次仅加胶囊网络")
+    logging.info(f"WeCLIP model created, capsule network: {'enabled' if args.use_capsule else 'disabled'}")
 
     param_groups = WeCLIP_model.get_param_groups()
     WeCLIP_model.cuda()
@@ -446,7 +442,7 @@ def train(cfg):
     attn_mask = get_mask_by_radius(h=mask_size, w=mask_size, radius=args.radius)
     writer = SummaryWriter(cfg.work_dir.tb_logger_dir)
 
-    # 为胶囊网络参数设置不同的学习率
+    # Set different learning rates for capsule network parameters
     optimizer_params = [
         {
             "params": param_groups[0],
@@ -470,11 +466,11 @@ def train(cfg):
         },
     ]
 
-    # 如果启用胶囊网络，添加胶囊网络参数组
+    # Add capsule network parameter group if enabled
     if args.use_capsule and len(param_groups) > 4:
         optimizer_params.append({
-            "params": param_groups[4],  # 胶囊网络参数
-            "lr": cfg.optimizer.learning_rate * 5,  # 胶囊网络使用较高学习率
+            "params": param_groups[4],  # Capsule network parameters
+            "lr": cfg.optimizer.learning_rate * 5,  # Higher learning rate for capsule network
             "weight_decay": cfg.optimizer.weight_decay,
         })
 
@@ -491,9 +487,8 @@ def train(cfg):
 
     train_loader_iter = iter(train_loader)
     avg_meter = AverageMeter()
-    criterion_dice = DiceLoss().cuda()
 
-    logging.info("开始训练循环")
+    logging.info("Starting training loop")
 
     for n_iter in range(cfg.train.max_iters):
 
@@ -503,39 +498,36 @@ def train(cfg):
             train_loader_iter = iter(train_loader)
             img_name, inputs, pseudo_labels, cls_labels, img_box = next(train_loader_iter)
 
-        # 前向传播 - 根据是否启用胶囊网络返回不同输出
+        # Forward pass - different outputs based on capsule network status
         outputs = WeCLIP_model(inputs.cuda(), img_name, mode='train')
 
         if args.use_capsule and len(outputs) == 4:
-            # 启用胶囊网络时的输出
+            # Capsule network enabled outputs
             segs, cam, attn_pred, capsule_outputs = outputs
         else:
-            # 标准输出
+            # Standard outputs
             segs, cam, attn_pred = outputs
             capsule_outputs = None
 
-        # 使用伪标签还是原来的cam
+        # Use pseudo labels
         pseudo_labels = pseudo_labels.cuda()
-        # pseudo_label = cam
 
-        # 对齐预测与伪标签尺寸
+        # Align prediction with pseudo label size
         segs = F.interpolate(segs, size=pseudo_labels.shape[1:], mode='bilinear', align_corners=False)
 
-        # 1. 计算语义分割损失
+        # 1. Compute segmentation loss
         seg_loss = get_seg_loss(segs, pseudo_labels.type(torch.long), ignore_index=cfg.dataset.ignore_index)
-        # dice损失
-        seg_loss2 = criterion_dice(segs, pseudo_labels.type(torch.long))
 
-        # 2. 计算胶囊网络损失（如果启用）
+        # 2. Compute capsule network loss (if enabled)
         capsule_loss = torch.tensor(0.0, device=segs.device)
         capsule_loss_dict = {}
         if args.use_capsule and capsule_outputs is not None:
             capsule_loss, capsule_loss_dict = WeCLIP_model.compute_capsule_loss(capsule_outputs, pseudo_labels)
 
-        # 使用原亲和力损失
+        # Use original affinity loss
         fts = cam.clone()
 
-        # 3. 计算亲和力损失
+        # 3. Compute affinity loss
         aff_label = cams_to_affinity_label(
             pseudo_labels.detach(),
             mask=attn_mask,
@@ -544,12 +536,11 @@ def train(cfg):
         )
         attn_loss, pos_count, neg_count = get_aff_loss(attn_pred, aff_label)
 
-        # 4. 计算总损失
-        total_loss = (1.0 * seg_loss + args.capsule_loss_weight * capsule_loss + 0.1 * attn_loss + 0.1*seg_loss2)
+        # 4. Compute total loss
+        total_loss = (1.0 * seg_loss + args.capsule_loss_weight * capsule_loss + 0.1 * attn_loss)
 
         avg_meter.add({
             'seg_loss': seg_loss.item(),
-            'seg_loss2': seg_loss2.item(),
             'attn_loss': attn_loss.item(),
             'capsule_loss': capsule_loss.item(),
             'total_loss': total_loss.item()
@@ -570,10 +561,9 @@ def train(cfg):
             seg_mAcc = (preds == gts).sum() / preds.size
 
             logging.info(
-                "Iter: %d; Elapsed: %s; ETA: %s; LR: %.3e; seg_loss: %.4f, seg_loss2: %.4f, attn_loss: %.4f, capsule_loss: %.4f, total_loss: %.4f, seg_mAcc: %.4f" % (
+                "Iter: %d; Elapsed: %s; ETA: %s; LR: %.3e; seg_loss: %.4f, attn_loss: %.4f, capsule_loss: %.4f, total_loss: %.4f, seg_mAcc: %.4f" % (
                     n_iter + 1, delta, eta, cur_lr,
                     avg_meter.pop('seg_loss'),
-                    avg_meter.pop('seg_loss2'),
                     avg_meter.pop('attn_loss'),
                     avg_meter.pop('capsule_loss'),
                     avg_meter.pop('total_loss'),
@@ -581,28 +571,27 @@ def train(cfg):
 
             writer.add_scalars('train/loss', {
                 "seg_loss": seg_loss.item(),
-                "seg_loss2": seg_loss.item(),
                 "attn_loss": attn_loss.item(),
                 "capsule_loss": capsule_loss.item(),
                 "total_loss": total_loss.item()
             }, global_step=n_iter)
 
-            # 如果有胶囊网络损失详情，也记录到tensorboard
+            # Log capsule network loss details to tensorboard if available
             if capsule_loss_dict:
                 writer.add_scalars('train/capsule_loss_detail', capsule_loss_dict, global_step=n_iter)
 
-            # 保存可视化图像（每500次迭代保存一次）
+            # Save visualization images (every 500 iterations)
             if (n_iter + 1) % (cfg.train.log_iters * 10) == 0:
                 try:
                     logging.info(
-                        f"可视化调试信息 - inputs: {inputs.shape}, segs: {segs.shape}, cam: {cam.shape}, pseudo_label: {pseudo_labels.shape}")
+                        f"Visualization debug info - inputs: {inputs.shape}, segs: {segs.shape}, cam: {cam.shape}, pseudo_label: {pseudo_labels.shape}")
                     save_visualization(inputs, segs, cam, pseudo_labels, img_name, cfg.work_dir.vis_dir,
                                        n_iter + 1, capsule_outputs=capsule_outputs)
-                    logging.info(f"保存可视化图像到 {cfg.work_dir.vis_dir}")
+                    logging.info(f"Saved visualization images to {cfg.work_dir.vis_dir}")
                 except Exception as e:
-                    logging.warning(f"保存可视化图像失败: {e}")
+                    logging.warning(f"Failed to save visualization images: {e}")
                     import traceback
-                    logging.warning(f"详细错误信息: {traceback.format_exc()}")
+                    logging.warning(f"Detailed error: {traceback.format_exc()}")
 
         if (n_iter + 1) % cfg.train.eval_iters == 0:
             model_name = "WeCLIP_capsule_model" if args.use_capsule else "WeCLIP_model"
@@ -610,9 +599,9 @@ def train(cfg):
             logging.info('Validating...')
             if (n_iter + 1) > 28000:
                 torch.save(WeCLIP_model.state_dict(), ckpt_name)
-                logging.info(f"模型保存到: {ckpt_name}")
+                logging.info(f"Model saved to: {ckpt_name}")
 
-            # 每隔几次验证保存一次可视化
+            # Save visualization every few validations
             save_vis = (n_iter + 1) % (cfg.train.eval_iters * 2) == 0
             seg_score, cam_score = validate(model=WeCLIP_model, data_loader=val_loader, cfg=cfg,
                                             save_vis=save_vis, iter_num=n_iter + 1)
@@ -621,7 +610,7 @@ def train(cfg):
             logging.info("segs score:")
             logging.info(seg_score)
 
-    logging.info("训练完成")
+    logging.info("Training completed")
     return True
 
 
@@ -629,7 +618,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # 处理胶囊网络参数逻辑
+    # Handle capsule network parameter logic
     if args.disable_capsule:
         args.use_capsule = False
 
@@ -655,7 +644,7 @@ if __name__ == "__main__":
     logging.info('\nargs: %s' % args)
     logging.info('\nconfigs: %s' % cfg)
     logging.info(
-        f'\n胶囊网络参数: capsule_loss_weight={args.capsule_loss_weight}, use_capsule={args.use_capsule}, primary_caps_num={args.primary_caps_num}, primary_caps_dim={args.primary_caps_dim}, num_routing={args.num_routing}')
+        f'\nCapsule network params: capsule_loss_weight={args.capsule_loss_weight}, use_capsule={args.use_capsule}, primary_caps_num={args.primary_caps_num}, primary_caps_dim={args.primary_caps_dim}, num_routing={args.num_routing}')
 
     setup_seed(1)
     train(cfg=cfg)
