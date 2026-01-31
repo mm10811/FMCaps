@@ -97,7 +97,9 @@ mkdir -p pretrained
 wget -P pretrained/ https://openaipublic.azureedge.net/clip/models/5806e77cd80f8b59890b7e101eabd078d9fb84e6937f9e85e4ecb61988df416f/ViT-B-16.pt
 ```
 ### Checkpoints of our model
-https://drive.google.com/drive/folders/1Gy_Zie4sfBWDiPvOcX3SQpYaMzgZQ52M?usp=drive_link
+voc:https://drive.google.com/file/d/1pnCglcXecQmxT2xKl0CDfBNZOVl_Fc1m/view?usp=drive_link
+coco:https://drive.google.com/file/d/15dfMgnt4Ts60-_Whqi8RgMIkV49avIz7/view?usp=drive_link
+
 ## 🚀 Usage
 
 ### Train Segmentation Network
