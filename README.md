@@ -17,9 +17,9 @@ Weakly-Supervised Semantic Segmentation (WSSS) strives to achieve dense pixel-le
 **Results:**
 | Dataset | Split | mIoU |
 |---------|-------|------|
-| PASCAL VOC 2012 | val | 78.2% |
+| PASCAL VOC 2012 | val | 79.0% |
 | PASCAL VOC 2012 | test | 78.7% |
-| MS COCO 2014 | val | 48.9% |
+| MS COCO 2014 | val |57.5% |
 
 ## 🏗️ Framework Overview
 <p align="center">
@@ -96,7 +96,8 @@ mkdir -p pretrained
 # Download ViT-B/16 from OpenAI CLIP
 wget -P pretrained/ https://openaipublic.azureedge.net/clip/models/5806e77cd80f8b59890b7e101eabd078d9fb84e6937f9e85e4ecb61988df416f/ViT-B-16.pt
 ```
-
+### Checkpoints of our model
+https://drive.google.com/drive/folders/1Gy_Zie4sfBWDiPvOcX3SQpYaMzgZQ52M?usp=drive_link
 ## 🚀 Usage
 
 ### Train Segmentation Network
