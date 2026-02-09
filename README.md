@@ -106,7 +106,7 @@ We provide pre-trained weights for two experimental settings to facilitate compa
 | :--- | :--- | :--- | :--- |
 | **PASCAL VOC** | Initial Submission | NVIDIA 2080Ti | [Link](https://drive.google.com/file/d/1pnCglcXecQmxT2xKl0CDfBNZOVl_Fc1m/view?usp=drive_link) |
 | **PASCAL VOC** | First Revision | NVIDIA 3090 | [Link](https://drive.google.com/file/d/1GezSiu0p4kdHs5Y_mrMB4397_J8BLW-I/view?usp=drive_link) |
-| **MS COCO** | Initial Submission | NVIDIA 2080Ti | [Link](https://drive.google.com/file/d/15dfMgnt4Ts60-_Whqi8RgMIkV49avIz7/view?usp=drive_link)) |
+| **MS COCO** | Initial Submission | NVIDIA 2080Ti | [Link](https://drive.google.com/file/d/15dfMgnt4Ts60-_Whqi8RgMIkV49avIz7/view?usp=drive_link) |
 | **MS COCO** | First Revision | NVIDIA 3090 | [Link](https://drive.google.com/file/d/1ftjmhY_ryT9gog4KRg94YOEq_kUUOqh9/view?usp=drive_link) |
 
 ## 🚀 Usage
