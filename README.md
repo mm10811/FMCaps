@@ -96,9 +96,18 @@ mkdir -p pretrained
 # Download ViT-B/16 from OpenAI CLIP
 wget -P pretrained/ https://openaipublic.azureedge.net/clip/models/5806e77cd80f8b59890b7e101eabd078d9fb84e6937f9e85e4ecb61988df416f/ViT-B-16.pt
 ```
-### Checkpoints of our model
-voc:https://drive.google.com/file/d/1pnCglcXecQmxT2xKl0CDfBNZOVl_Fc1m/view?usp=drive_link
-coco:https://drive.google.com/file/d/15dfMgnt4Ts60-_Whqi8RgMIkV49avIz7/view?usp=drive_link
+## 📍 Model Checkpoints
+
+We provide pre-trained weights for two experimental settings to facilitate comparison and reproducibility:
+1.  **Initial Submission**: Trained on **NVIDIA 2080Ti** (Corresponds to the *Test* set results in the paper).
+2.  **First Revision**: Trained on **NVIDIA RTX 3090** (Corresponds to the *Val* set results in the paper).
+
+| Dataset | Version | Hardware | Download |
+| :--- | :--- | :--- | :--- |
+| **PASCAL VOC** | Initial Submission | NVIDIA 2080Ti | [Link](https://drive.google.com/file/d/1pnCglcXecQmxT2xKl0CDfBNZOVl_Fc1m/view?usp=drive_link) |
+| **PASCAL VOC** | First Revision | NVIDIA 3090 | [Link](https://drive.google.com/file/d/1GezSiu0p4kdHs5Y_mrMB4397_J8BLW-I/view?usp=drive_link) |
+| **MS COCO** | Initial Submission | NVIDIA 2080Ti | [Link](https://drive.google.com/file/d/15dfMgnt4Ts60-_Whqi8RgMIkV49avIz7/view?usp=drive_link)) |
+| **MS COCO** | First Revision | NVIDIA 3090 | [Link](https://drive.google.com/file/d/1ftjmhY_ryT9gog4KRg94YOEq_kUUOqh9/view?usp=drive_link) |
 
 ## 🚀 Usage
 
